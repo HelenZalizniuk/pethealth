@@ -21,7 +21,7 @@ type HealthMetricRepository interface {
 }
 
 type OutboxRepository interface {
-	CreateEvent(ctx context.Context, tx *sql.Tx, event *models.OutboxEvent) error
+	CreateEvent(ctx context.Context, tx *sql.Tx, event *models.OutboxEvent, shardingKey uint64) error
 	FetchPending(ctx context.Context, limit int) ([]models.OutboxEvent, error)
 	MarkAsPublished(ctx context.Context, id string) error
 }
@@ -29,4 +29,8 @@ type OutboxRepository interface {
 // Transactor — interface for managing transactions within a single shard.
 type Transactor interface {
 	BeginTx(ctx context.Context) (*sql.Tx, error)
+}
+
+type ThresholdProvider interface {
+	GetThreshold(ctx context.Context, petID uint64, metricType string) (float64, error)
 }
