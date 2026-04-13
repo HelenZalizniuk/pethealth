@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"pethealth/internal/domain/models"
 	"pethealth/internal/infrastructure/db"
 )
@@ -16,14 +17,14 @@ func NewPGOutboxRepository(sm *db.ShardManager) *pgOutboxRepository {
 }
 
 // save event in the same transaction as the metric
-func (r *pgOutboxRepository) CreateEvent(ctx context.Context, tx *sql.Tx, event *models.OutboxEvent) error {
-	// TODO: to determine the shard, we might need to look at the event's payload or metadata. For simplicity, we use a fixed shard here.
-	db, err := r.shardManager.GetShardById(0)
+func (r *pgOutboxRepository) CreateEvent(ctx context.Context, tx *sql.Tx, event *models.OutboxEvent, shardingKey uint64) error {
+
+	dbConn, err := r.shardManager.GetShardById(shardingKey)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to route outbox event to shard: %w", err)
 	}
 
-	return db.WithContext(ctx).Table("outbox_events").Create(event).Error
+	return dbConn.WithContext(ctx).Table("outbox_events").Create(event).Error
 }
 
 // usually wokrks in background

@@ -24,3 +24,5 @@ go.sum
 *.swo
 
 .docker/
+
+structure.txt
