@@ -59,6 +59,7 @@ func (u *MetricUseCase) ProcessMetric(ctx context.Context, metric *models.Health
 
 		event := &models.OutboxEvent{
 			ID:        uuid.New().String(),
+			PetID:     metric.PetID,
 			Payload:   payload,
 			Topic:     TopicHealthAlerts,
 			Status:    StatusPending,
