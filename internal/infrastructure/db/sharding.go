@@ -3,6 +3,8 @@ package db
 import (
 	"fmt"
 
+	"pethealth/internal/config"
+
 	"gorm.io/gorm"
 )
 
@@ -11,8 +13,19 @@ type ShardManager struct {
 	shards map[int]*gorm.DB
 }
 
-func NewShardManager(shards map[int]*gorm.DB) *ShardManager {
-	return &ShardManager{shards: shards}
+func NewShardManager(shardConfigs []config.ShardConfig) (*ShardManager, error) {
+	shards := make(map[int]*gorm.DB)
+
+	for i, cfg := range shardConfigs {
+
+		dbConn, err := NewPostgresDB(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to shard %d: %w", i, err)
+		}
+		shards[i] = dbConn
+	}
+
+	return &ShardManager{shards: shards}, nil
 }
 
 // selects the appropriate shard based on the pet ID
