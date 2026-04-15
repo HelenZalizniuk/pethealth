@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package metrics;
+
+option go_package = "pethealth/internal/infrastructure/transport/proto;metrics_proto";
+
+message HealthMetricRequest {
+    uint64 pet_id = 1;
+    string type   = 2;
+    double value  = 3;
+}
+
+message HealthMetricResponse {
+    string status  = 1;
+    string message = 2;
+}

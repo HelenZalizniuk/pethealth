@@ -8,11 +8,18 @@ type ShardConfig struct {
 }
 
 type Config struct {
-	Shards []ShardConfig
+	Shards     []ShardConfig
+	ServerPort string
 }
 
 func Load() *Config {
+	port := os.Getenv("SERVER_PORT")
+	if port == "" {
+		port = "8080" // default port
+	}
+
 	return &Config{
+		ServerPort: port,
 		Shards: []ShardConfig{
 			{
 				MasterDSN:  os.Getenv("SHARD_0_MASTER_DSN"),
