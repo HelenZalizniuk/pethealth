@@ -2,34 +2,50 @@ package app
 
 import (
 	"fmt"
+	"log"
 	"pethealth/internal/config"
 	"pethealth/internal/infrastructure/db"
+	"pethealth/internal/infrastructure/service"
+	"pethealth/internal/usecase"
 
-	"gorm.io/gorm"
+	infraRepo "pethealth/internal/infrastructure/repository"
 )
 
 type App struct {
-	ShardManager *db.ShardManager
-	Config       *config.Config
+	Cfg           *config.Config
+	MetricUseCase *usecase.MetricUseCase
 }
 
-func NewApp() (*App, error) {
-	cfg := config.Load()
-	shards := make(map[int]*gorm.DB)
-
-	for i, shardCfg := range cfg.Shards {
-
-		conn, err := db.NewPostgresDB(shardCfg)
-		if err != nil {
-			return nil, fmt.Errorf("failed to connect to shard %d: %w", i, err)
-		}
-		shards[i] = conn
+// root initializer for the application
+func NewApp(cfg *config.Config) (*App, error) {
+	// 1. Init Infrastructure (Database Shards)
+	shardManager, err := db.NewShardManager(cfg.Shards)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init shard manager: %w", err)
 	}
 
-	shardManager := db.NewShardManager(shards)
+	// 2. Init Repositories
+	metricRepo := infraRepo.NewPGHealthMetricRepository(shardManager)
+	outboxRepo := infraRepo.NewPGOutboxRepository(shardManager)
+
+	// 3. Init Services
+	thresholdService := service.NewStaticThresholdService(150.0)
+
+	// 4. Init UseCases
+	metricUseCase := usecase.NewMetricUseCase(metricRepo, outboxRepo, thresholdService)
 
 	return &App{
-		ShardManager: shardManager,
-		Config:       cfg,
+		Cfg:           cfg,
+		MetricUseCase: metricUseCase,
 	}, nil
+}
+
+// Run starts the application components
+func (a *App) Run() error {
+	log.Println("PetHealth Service is starting...")
+
+	// TODO: HTTP server initialization.
+
+	log.Println("System is ready and waiting for metrics.")
+	return nil
 }
