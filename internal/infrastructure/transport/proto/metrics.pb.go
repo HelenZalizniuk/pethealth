@@ -23,9 +23,10 @@ const (
 
 type HealthMetricRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	PetId         uint64                 `protobuf:"varint,1,opt,name=pet_id,json=petId,proto3" json:"pet_id,omitempty"`
-	Type          string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
-	Value         float64                `protobuf:"fixed64,3,opt,name=value,proto3" json:"value,omitempty"`
+	ExternalId    string                 `protobuf:"bytes,1,opt,name=external_id,json=externalId,proto3" json:"external_id,omitempty"`
+	PetId         uint64                 `protobuf:"varint,2,opt,name=pet_id,json=petId,proto3" json:"pet_id,omitempty"`
+	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	Value         float64                `protobuf:"fixed64,4,opt,name=value,proto3" json:"value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -58,6 +59,13 @@ func (x *HealthMetricRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use HealthMetricRequest.ProtoReflect.Descriptor instead.
 func (*HealthMetricRequest) Descriptor() ([]byte, []int) {
 	return file_metrics_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *HealthMetricRequest) GetExternalId() string {
+	if x != nil {
+		return x.ExternalId
+	}
+	return ""
 }
 
 func (x *HealthMetricRequest) GetPetId() uint64 {
@@ -137,11 +145,13 @@ var File_metrics_proto protoreflect.FileDescriptor
 
 const file_metrics_proto_rawDesc = "" +
 	"\n" +
-	"\rmetrics.proto\x12\ametrics\"V\n" +
-	"\x13HealthMetricRequest\x12\x15\n" +
-	"\x06pet_id\x18\x01 \x01(\x04R\x05petId\x12\x12\n" +
-	"\x04type\x18\x02 \x01(\tR\x04type\x12\x14\n" +
-	"\x05value\x18\x03 \x01(\x01R\x05value\"H\n" +
+	"\rmetrics.proto\x12\ametrics\"w\n" +
+	"\x13HealthMetricRequest\x12\x1f\n" +
+	"\vexternal_id\x18\x01 \x01(\tR\n" +
+	"externalId\x12\x15\n" +
+	"\x06pet_id\x18\x02 \x01(\x04R\x05petId\x12\x12\n" +
+	"\x04type\x18\x03 \x01(\tR\x04type\x12\x14\n" +
+	"\x05value\x18\x04 \x01(\x01R\x05value\"H\n" +
 	"\x14HealthMetricResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessageBAZ?pethealth/internal/infrastructure/transport/proto;metrics_protob\x06proto3"

@@ -5,9 +5,10 @@ package metrics;
 option go_package = "pethealth/internal/infrastructure/transport/proto;metrics_proto";
 
 message HealthMetricRequest {
-    uint64 pet_id = 1;
-    string type   = 2;
-    double value  = 3;
+    string external_id = 1;
+    uint64 pet_id = 2;
+    string type   = 3;
+    double value  = 4;
 }
 
 message HealthMetricResponse {

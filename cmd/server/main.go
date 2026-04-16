@@ -4,8 +4,16 @@ import (
 	"log"
 	"pethealth/internal/app"
 	"pethealth/internal/config"
+	"pethealth/internal/infrastructure/db"
+	"pethealth/internal/infrastructure/logger"
+	"pethealth/internal/infrastructure/repository"
+	"pethealth/internal/infrastructure/service"
+	"pethealth/internal/infrastructure/transport"
+	"pethealth/internal/infrastructure/validator"
+	"pethealth/internal/usecase"
 
 	"github.com/joho/godotenv"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -17,12 +25,27 @@ func main() {
 
 	// load configuration
 	cfg := config.Load()
+	l := logger.NewLogger()
+	defer l.Sync()
+
+	v := validator.NewCustomValidator()
+
+	// Data & business layer setup
+	sm, err := db.NewShardManager(cfg.Shards)
+	if err != nil {
+		l.Fatal("Failed to initialize ShardManager", zap.Error(err))
+	}
+
+	metricRepo := repository.NewPGHealthMetricRepository(sm)
+	outboxRepo := repository.NewPGOutboxRepository(sm)
+	thresholds := service.NewStaticThresholdService(140.0)
+
+	uc := usecase.NewMetricUseCase(metricRepo, outboxRepo, thresholds)
+
+	handler := transport.NewMetricHandler(uc, v, l)
 
 	// initialize
-	application, err := app.NewApp(cfg)
-	if err != nil {
-		log.Fatalf("Failed to initialize application: %v", err)
-	}
+	application := app.NewApp(cfg, handler, l)
 
 	// run the application (starts HTTP server, etc.)
 	if err := application.Run(); err != nil {
