@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"log"
 	"pethealth/internal/app"
 	"pethealth/internal/config"
 	"pethealth/internal/infrastructure/db"
+	"pethealth/internal/infrastructure/kafka"
 	"pethealth/internal/infrastructure/logger"
 	"pethealth/internal/infrastructure/repository"
 	"pethealth/internal/infrastructure/service"
 	"pethealth/internal/infrastructure/transport"
 	"pethealth/internal/infrastructure/validator"
+	"pethealth/internal/infrastructure/worker"
 	"pethealth/internal/usecase"
 
 	"github.com/joho/godotenv"
@@ -44,8 +47,23 @@ func main() {
 
 	handler := transport.NewMetricHandler(uc, v, l)
 
+	producer := kafka.NewMetricProducer(cfg.KafkaBrokers, cfg.KafkaTopic, l)
+	defer producer.Close()
+
+	// Initialize required Kafka topics before starting the application
+	ctx := context.Background()
+	if err := producer.EnsureTopicExists(ctx, cfg.KafkaTopic); err != nil {
+		l.Fatal("Failed to ensure Kafka topic exists",
+			zap.String("topic", cfg.KafkaTopic),
+			zap.Error(err),
+		)
+	}
+
+	relayProcessor := worker.NewOutboxProcessor(outboxRepo, producer, l)
+	relayPool := worker.NewWorkerPool(2, relayProcessor, l)
+
 	// initialize
-	application := app.NewApp(cfg, handler, l)
+	application := app.NewApp(cfg, handler, l, sm, relayPool)
 
 	// run the application (starts HTTP server, etc.)
 	if err := application.Run(); err != nil {

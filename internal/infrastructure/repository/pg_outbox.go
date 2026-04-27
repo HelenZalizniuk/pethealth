@@ -6,18 +6,20 @@ import (
 	"fmt"
 	"pethealth/internal/domain/models"
 	"pethealth/internal/infrastructure/db"
+
+	"gorm.io/gorm"
 )
 
-type pgOutboxRepository struct {
+type PgOutboxRepository struct {
 	shardManager *db.ShardManager
 }
 
-func NewPGOutboxRepository(sm *db.ShardManager) *pgOutboxRepository {
-	return &pgOutboxRepository{shardManager: sm}
+func NewPGOutboxRepository(sm *db.ShardManager) *PgOutboxRepository {
+	return &PgOutboxRepository{shardManager: sm}
 }
 
 // save event in the same transaction as the metric
-func (r *pgOutboxRepository) CreateEvent(ctx context.Context, tx *sql.Tx, event *models.OutboxEvent, shardingKey uint64) error {
+func (r *PgOutboxRepository) CreateEvent(ctx context.Context, tx *sql.Tx, event *models.OutboxEvent, shardingKey uint64) error {
 
 	dbConn, err := r.shardManager.GetShardById(shardingKey)
 	if err != nil {
@@ -27,13 +29,38 @@ func (r *pgOutboxRepository) CreateEvent(ctx context.Context, tx *sql.Tx, event 
 	return dbConn.WithContext(ctx).Table("outbox_events").Create(event).Error
 }
 
-// usually wokrks in background
-func (r *pgOutboxRepository) FetchPending(ctx context.Context, limit int) ([]models.OutboxEvent, error) {
-	// Тут воркер должен будет пройтись по всем шардам и собрать события.
-	// TODO: relay
-	return nil, nil
+// get events with pending locking them from other workers
+func (r *PgOutboxRepository) FetchAndLockPending(ctx context.Context, shardID int, limit int) ([]models.OutboxEvent, error) {
+	dbConn, err := r.shardManager.GetShardById(uint64(shardID))
+	if err != nil {
+		return nil, err
+	}
+
+	var events []models.OutboxEvent
+
+	// using transaction with FOR UPDATE
+	err = dbConn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// SKIP LOCKED allows multiple workers to fetch from the same shard without blocking each other
+		rawSQL := `
+			SELECT * FROM outbox_events 
+			WHERE status = 'pending' 
+			LIMIT ? 
+			FOR UPDATE SKIP LOCKED`
+
+		return tx.Raw(rawSQL, limit).Scan(&events).Error
+	})
+
+	return events, err
 }
 
-func (r *pgOutboxRepository) MarkAsPublished(ctx context.Context, id string) error {
-	return nil
+func (r *PgOutboxRepository) MarkAsPublished(ctx context.Context, id string, petID uint64) error {
+	dbConn, err := r.shardManager.GetShardById(petID)
+	if err != nil {
+		return err
+	}
+
+	return dbConn.WithContext(ctx).
+		Table("outbox_events").
+		Where("id = ?", id).
+		Update("status", "published").Error
 }

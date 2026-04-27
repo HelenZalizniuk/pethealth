@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # Shard №0
+  postgres_0:
+    image: postgres:15-alpine
+    container_name: pethealth_db_0
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: pethealth_0
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d pethealth_0"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Shard №1
+  postgres_1:
+    image: postgres:15-alpine
+    container_name: pethealth_db_1
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: pethealth_1
+    ports:
+      - "5434:5432" # 5434 снаружи на 5432 внутри
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d pethealth_1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Migrations for both shards
+  migrate_db_0:
+    image: migrate/migrate
+    volumes:
+      - ./migrations:/migrations
+    command:
+      - -path=/migrations/
+      - -database=postgres://user:password@postgres_0:5432/pethealth_0?sslmode=disable
+      - up
+    depends_on:
+      postgres_0:
+        condition: service_healthy
+
+  migrate_db_1:
+    image: migrate/migrate
+    volumes:
+      - ./migrations:/migrations
+    command:
+      - -path=/migrations/
+      - -database=postgres://user:password@postgres_1:5432/pethealth_1?sslmode=disable
+      - up
+    depends_on:
+      postgres_1:
+        condition: service_healthy    
+
+  # Kafka + Zookeeper (one broker - 3 partitions)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_ENABLE_KRAFT: 'false' 
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+
+  # Kafka front
+  kafdrop:
+    image: obsidiandynamics/kafdrop:latest
+    depends_on:
+      - kafka
+    ports:
+      - "9000:9000"
+    environment:
+      KAFKA_BROKERCONNECT: kafka:29092
+      JVM_OPTS: "-Xms32M -Xmx64M"

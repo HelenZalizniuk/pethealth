@@ -8,8 +8,10 @@ type ShardConfig struct {
 }
 
 type Config struct {
-	Shards     []ShardConfig
-	ServerPort string
+	Shards       []ShardConfig
+	ServerPort   string
+	KafkaBrokers []string // Brokers list
+	KafkaTopic   string   // Metrics topic
 }
 
 func Load() *Config {
@@ -18,8 +20,15 @@ func Load() *Config {
 		port = "8080" // default port
 	}
 
+	topic := os.Getenv("KAFKA_TOPIC")
+	if topic == "" {
+		topic = "health_alerts"
+	}
+
 	return &Config{
-		ServerPort: port,
+		ServerPort:   port,
+		KafkaBrokers: []string{os.Getenv("KAFKA_BROKERS")},
+		KafkaTopic:   topic,
 		Shards: []ShardConfig{
 			{
 				MasterDSN:  os.Getenv("SHARD_0_MASTER_DSN"),

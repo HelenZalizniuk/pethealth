@@ -13,6 +13,22 @@ type ShardManager struct {
 	shards map[int]*gorm.DB
 }
 
+func (s *ShardManager) Ping() error {
+
+	for i, dbConn := range s.shards {
+		// getting sql.DB from GORM wrapper
+		sqlDB, err := dbConn.DB()
+		if err != nil {
+			return fmt.Errorf("failed to get sql.DB for shard %d: %w", i, err)
+		}
+		// pinging each shard to ensure connectivity
+		if err := sqlDB.Ping(); err != nil {
+			return fmt.Errorf("shard %d is unreachable: %w", i, err)
+		}
+	}
+	return nil
+}
+
 func NewShardManager(shardConfigs []config.ShardConfig) (*ShardManager, error) {
 	shards := make(map[int]*gorm.DB)
 
