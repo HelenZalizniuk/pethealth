@@ -1,9 +1,11 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 type HealthMetric struct {
-	ID         uint64    `json:"id" gorm:"primaryKey"`
+	ID         string    `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
 	ExternalID string    `json:"external_id" gorm:"uniqueIndex" validate:"required,uuid4"`
 	PetID      uint64    `json:"pet_id" gorm:"index" validate:"required,gt=0"`
 	Type       string    `json:"type" validate:"required,oneof=heart_rate temperature weight"` // e.g., "heart_rate", "temperature"

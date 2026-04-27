@@ -26,3 +26,7 @@ go.sum
 .docker/
 
 structure.txt
+
+.postman/
+postman/
+resources.yaml
