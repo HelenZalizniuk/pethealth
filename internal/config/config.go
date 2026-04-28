@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"os"
+	"strings"
+)
 
 type ShardConfig struct {
 	MasterDSN  string
@@ -25,9 +28,12 @@ func Load() *Config {
 		topic = "health_alerts"
 	}
 
+	brokersEnv := os.Getenv("KAFKA_BROKERS")
+	brokers := strings.Split(brokersEnv, ",")
+
 	return &Config{
 		ServerPort:   port,
-		KafkaBrokers: []string{os.Getenv("KAFKA_BROKERS")},
+		KafkaBrokers: brokers,
 		KafkaTopic:   topic,
 		Shards: []ShardConfig{
 			{
