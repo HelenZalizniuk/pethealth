@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pethealth-config
+data:
+  SERVER_PORT: "8080"
+  KAFKA_TOPIC: "health_alerts"
+  # host.minikube.internal —  domain allows the pod to reach services on your host (Windows)
+  KAFKA_BROKERS: "host.minikube.internal:9092"
+  SHARD_0_MASTER_DSN: "host=host.minikube.internal user=user password=password dbname=pethealth_0 port=5432 sslmode=disable"
+  SHARD_0_REPLICA_DSN: "host=host.minikube.internal user=user password=password dbname=pethealth_0 port=5432 sslmode=disable"
+  SHARD_1_MASTER_DSN: "host=host.minikube.internal user=user password=password dbname=pethealth_1 port=5434 sslmode=disable"
+  SHARD_1_REPLICA_DSN: "host=host.minikube.internal user=user password=password dbname=pethealth_1 port=5434 sslmode=disable"
