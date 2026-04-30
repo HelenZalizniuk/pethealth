@@ -11,30 +11,32 @@ type ShardConfig struct {
 }
 
 type Config struct {
-	Shards       []ShardConfig
-	ServerPort   string
-	KafkaBrokers []string // Brokers list
-	KafkaTopic   string   // Metrics topic
+	ServerPort         string
+	KafkaBrokers       []string
+	KafkaTopic         string
+	KafkaDLQTopic      string
+	KafkaConsumerGroup string
+	Shards             []ShardConfig
 }
 
 func Load() *Config {
-	port := os.Getenv("SERVER_PORT")
-	if port == "" {
-		port = "8080" // default port
-	}
-
-	topic := os.Getenv("KAFKA_TOPIC")
-	if topic == "" {
-		topic = "health_alerts"
-	}
+	port := getEnv("SERVER_PORT", "8080")
+	topic := getEnv("KAFKA_TOPIC", "pet_events")
+	dlqTopic := getEnv("KAFKA_DLQ_TOPIC", "pet_events_dlq")
+	group := getEnv("KAFKA_CONSUMER_GROUP", "health-service-group")
 
 	brokersEnv := os.Getenv("KAFKA_BROKERS")
+	if brokersEnv == "" {
+		brokersEnv = "localhost:9092"
+	}
 	brokers := strings.Split(brokersEnv, ",")
 
 	return &Config{
-		ServerPort:   port,
-		KafkaBrokers: brokers,
-		KafkaTopic:   topic,
+		ServerPort:         port,
+		KafkaBrokers:       brokers,
+		KafkaTopic:         topic,
+		KafkaDLQTopic:      dlqTopic,
+		KafkaConsumerGroup: group,
 		Shards: []ShardConfig{
 			{
 				MasterDSN:  os.Getenv("SHARD_0_MASTER_DSN"),
@@ -46,4 +48,11 @@ func Load() *Config {
 			},
 		},
 	}
+}
+
+func getEnv(key, defaultValue string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return defaultValue
 }

@@ -80,8 +80,25 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_ENABLE_KRAFT: 'false' 
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      # KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'  -- for local
       KAFKA_NUM_PARTITIONS: 3
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - kafka
+    entrypoint: [ "/bin/sh", "-c" ]
+    command: |
+      # wait for Kafka to be ready
+      cub kafka-ready -b kafka:29092 1 30;
+      
+      # create the main topic (3 partitions for parallel processing by workers)
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --partitions 3 --replication-factor 1 --topic pet_events;
+      
+      # create the DLQ topic (1 partition is enough for errors)
+      kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1 --topic pet_events_dlq;
+      
+      echo "Kafka topics created successfully."
 
   # Kafka front
   kafdrop:
