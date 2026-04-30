@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 )
 
@@ -93,6 +94,9 @@ func (a *App) Run() error {
 		}
 		c.JSON(http.StatusOK, gin.H{"status": "READY"})
 	})
+
+	// Prometheus Metrics
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// API-metrics group
 	api := r.Group("/api/v1")

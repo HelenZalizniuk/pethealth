@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"pethealth/internal/domain/models"
 	"pethealth/internal/infrastructure/db"
+	"pethealth/internal/infrastructure/metrics"
 
 	"gorm.io/gorm"
 )
@@ -31,23 +32,26 @@ func (r *PgOutboxRepository) CreateEvent(ctx context.Context, tx *sql.Tx, event 
 
 // get events with pending locking them from other workers
 func (r *PgOutboxRepository) FetchAndLockPending(ctx context.Context, shardID int, limit int) ([]models.OutboxEvent, error) {
-	dbConn, err := r.shardManager.GetShardById(uint64(shardID))
-	if err != nil {
-		return nil, err
-	}
-
 	var events []models.OutboxEvent
+	shardName := r.shardManager.GetShardName(uint64(shardID))
 
-	// using transaction with FOR UPDATE
-	err = dbConn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// SKIP LOCKED allows multiple workers to fetch from the same shard without blocking each other
-		rawSQL := `
+	err := metrics.ObserveDBQuery(shardName, "outbox_fetch_lock", func() error {
+		dbConn, err := r.shardManager.GetShardById(uint64(shardID))
+		if err != nil {
+			return err
+		}
+
+		// using transaction with FOR UPDATE
+		return dbConn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			// SKIP LOCKED allows multiple workers to fetch from the same shard without blocking each other
+			rawSQL := `
 			SELECT * FROM outbox_events 
 			WHERE status = 'pending' 
 			LIMIT ? 
 			FOR UPDATE SKIP LOCKED`
 
-		return tx.Raw(rawSQL, limit).Scan(&events).Error
+			return tx.Raw(rawSQL, limit).Scan(&events).Error
+		})
 	})
 
 	return events, err

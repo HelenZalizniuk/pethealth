@@ -2,8 +2,10 @@ package repository
 
 import (
 	"context"
+
 	"pethealth/internal/domain/models"
 	"pethealth/internal/infrastructure/db"
+	"pethealth/internal/infrastructure/metrics"
 )
 
 type pgHealthMetricRepository struct {
@@ -15,13 +17,16 @@ func NewPGHealthMetricRepository(sm *db.ShardManager) *pgHealthMetricRepository 
 }
 
 func (r *pgHealthMetricRepository) Store(ctx context.Context, metric *models.HealthMetric) error {
-	// sharding by PetID, to ensure all metrics for a pet go to the same shard
-	db, err := r.shardManager.GetShardById(metric.PetID)
-	if err != nil {
-		return err
-	}
 
-	return db.WithContext(ctx).Create(metric).Error
+	shardName := r.shardManager.GetShardName(metric.PetID)
+
+	return metrics.ObserveDBQuery(shardName, "health_metric_store", func() error {
+		db, err := r.shardManager.GetShardById(metric.PetID)
+		if err != nil {
+			return err
+		}
+		return db.WithContext(ctx).Create(metric).Error
+	})
 }
 
 func (r *pgHealthMetricRepository) GetByPetID(ctx context.Context, petID uint64, limit int) ([]models.HealthMetric, error) {
