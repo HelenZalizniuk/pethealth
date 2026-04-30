@@ -8,10 +8,11 @@ The project implements several distributed systems patterns:
 
 *   **Transactional Outbox:** Ensures atomicity between state persistence in PostgreSQL and event publishing to Kafka.
 *   **Database Sharding:** Manual horizontal sharding of PostgreSQL based on `pet_id` (consistent hashing) to distribute write load.
+*   **Reliability Layer:** Implements **Retry Policy** with exponential backoff in Go-workers and **Dead Letter Queues (DLQ)** to handle transient and poison-pill messages without blocking the main pipeline.
 *   **Worker Pool:** Concurrent task processing with a bounded goroutine pool to manage resource consumption and handle graceful shutdown.
 *   **Graceful Shutdown:** Proper handling of `SIGTERM`/`SIGINT` signals to ensure active workers complete tasks without data loss.
 *   **Event-Driven Design:** Asynchronous component interaction via Kafka for service decoupling.
-* **Cloud Native:** Fully containerized and ready for Kubernetes deployment.
+*   **Cloud Native:** Fully containerized and ready for **Kubernetes** deployment.
 
 ## 🛠 Tech Stack
 
@@ -69,15 +70,17 @@ kubectl delete -f k8s/config.yaml
 ## 📊 Sharding Logic
 
 Data distribution across shards is calculated using a consistent hashing approach:
-
 $$shard\_index = pet\_id \pmod{total\_shards}$$
 
 *   **Data Locality:** Ensures all data for a specific pet resides on the same shard.
 *   **Scalability:** Simplifies horizontal scaling of the database layer.
 
+### Failure Handling
+*   **Outbox Workers:** Attempt re-delivery if Kafka is temporarily unavailable.
+*   **Consumer DLQ:** Messages failing processing after N retries are moved to `pet_events_dlq`.
+
 ## 📝 Roadmap
 
-*   [ ] **Reliability Layer:** Implementation of **Retry Policy** and **Dead Letter Queues (DLQ)** for Kafka consumers.
-*   [ ] **Distributed Transactions:** **Saga Pattern** for the "Pet Registration & Alert Generation" flow.
-*   [ ] **Observability:** Grafana dashboards for metrics visualization (Kafka lag, Worker Pool state).
+*   [ ] **Distributed Transactions:** **Saga Pattern (Choreography)** for the "Pet Registration & Alert Generation" flow.
+*   [ ] **Observability:** Grafana dashboards for monitoring Kafka lag and Worker Pool state.
 *   [ ] **Tracing:** **Distributed Tracing** integration (OpenTelemetry/Jaeger).

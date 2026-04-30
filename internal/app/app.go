@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"pethealth/internal/config"
 	"pethealth/internal/infrastructure/db"
-	"pethealth/internal/infrastructure/kafka"
+	infrakafka "pethealth/internal/infrastructure/kafka"
 	"pethealth/internal/infrastructure/transport"
 	"pethealth/internal/infrastructure/transport/middleware"
 	"pethealth/internal/infrastructure/worker"
@@ -17,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
 )
 
@@ -26,7 +27,7 @@ type App struct {
 	Logger        *zap.Logger
 	sm            *db.ShardManager
 	relayPool     *worker.WorkerPool
-	consumer      *kafka.MetricConsumer
+	consumer      *infrakafka.MetricConsumer
 }
 
 // root initializer for the application
@@ -34,9 +35,17 @@ func NewApp(cfg *config.Config,
 	handler *transport.MetricHandler,
 	logger *zap.Logger,
 	sm *db.ShardManager,
-	relayPool *worker.WorkerPool) *App {
+	relayPool *worker.WorkerPool,
+	producer *infrakafka.MetricProducer,
+) *App {
 
-	consumer := kafka.NewMetricConsumer(cfg.KafkaBrokers, cfg.KafkaTopic, "health-service-group", logger)
+	consumer := infrakafka.NewMetricConsumer(
+		cfg.KafkaBrokers,
+		cfg.KafkaTopic,
+		cfg.KafkaDLQTopic,
+		cfg.KafkaConsumerGroup,
+		producer,
+		logger)
 	return &App{
 		Cfg:           cfg,
 		MetricHandler: handler,
@@ -60,17 +69,19 @@ func (a *App) checkDependencies() error {
 func (a *App) Run() error {
 	a.Logger.Info("PetHealth Service is starting...", zap.String("port", a.Cfg.ServerPort))
 
-	// 1. Context for background processes
+	// Context for background processes
 	workerCtx, cancelWorkers := context.WithCancel(context.Background())
 	defer cancelWorkers()
 
-	// 2. Start Relay
+	// Start Relay
 	a.Logger.Info("Starting Outbox Relay workers...")
 	go a.relayPool.Start(workerCtx)
 
-	// 3. Start Kafka Consumer
+	// Start Kafka Consumer
 	a.Logger.Info("Starting Kafka consumer...")
-	go a.consumer.Start(workerCtx)
+	go a.consumer.Start(workerCtx, func(ctx context.Context, msg kafka.Message) error {
+		return a.MetricHandler.ProcessMetric(ctx, msg.Value)
+	})
 
 	// Setup HTTP Server (GIN)
 	r := gin.Default()

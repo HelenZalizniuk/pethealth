@@ -28,15 +28,15 @@ func main() {
 
 	// load configuration
 	cfg := config.Load()
-	l := logger.NewLogger()
-	defer l.Sync()
+	logger := logger.NewLogger()
+	defer logger.Sync()
 
 	v := validator.NewCustomValidator()
 
 	// Data & business layer setup
 	sm, err := db.NewShardManager(cfg.Shards)
 	if err != nil {
-		l.Fatal("Failed to initialize ShardManager", zap.Error(err))
+		logger.Fatal("Failed to initialize ShardManager", zap.Error(err))
 	}
 
 	metricRepo := repository.NewPGHealthMetricRepository(sm)
@@ -45,25 +45,25 @@ func main() {
 
 	uc := usecase.NewMetricUseCase(metricRepo, outboxRepo, thresholds)
 
-	handler := transport.NewMetricHandler(uc, v, l)
+	handler := transport.NewMetricHandler(uc, v, logger)
 
-	producer := kafka.NewMetricProducer(cfg.KafkaBrokers, cfg.KafkaTopic, l)
+	producer := kafka.NewMetricProducer(cfg.KafkaBrokers, cfg.KafkaTopic, logger)
 	defer producer.Close()
 
 	// Initialize required Kafka topics before starting the application
 	ctx := context.Background()
 	if err := producer.EnsureTopicExists(ctx, cfg.KafkaTopic); err != nil {
-		l.Fatal("Failed to ensure Kafka topic exists",
+		logger.Fatal("Failed to ensure Kafka topic exists",
 			zap.String("topic", cfg.KafkaTopic),
 			zap.Error(err),
 		)
 	}
 
-	relayProcessor := worker.NewOutboxProcessor(outboxRepo, producer, l)
-	relayPool := worker.NewWorkerPool(2, relayProcessor, l)
+	relayProcessor := worker.NewOutboxProcessor(outboxRepo, producer, logger)
+	relayPool := worker.NewWorkerPool(2, relayProcessor, logger)
 
 	// initialize
-	application := app.NewApp(cfg, handler, l, sm, relayPool)
+	application := app.NewApp(cfg, handler, logger, sm, relayPool, producer)
 
 	// run the application (starts HTTP server, etc.)
 	if err := application.Run(); err != nil {

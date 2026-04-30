@@ -82,3 +82,18 @@ func (p *MetricProducer) EnsureTopicExists(ctx context.Context, topic string) er
 	p.logger.Info("Successfully created kafka topic", zap.String("topic", topic))
 	return nil
 }
+
+func (p *MetricProducer) SendToTopic(ctx context.Context, topic string, key []byte, value []byte) error {
+	err := p.writer.WriteMessages(ctx, kafka.Message{
+		Topic: topic,
+		Key:   key,
+		Value: value,
+	})
+	if err != nil {
+		p.logger.Error("Failed to send message to DLQ",
+			zap.String("topic", topic),
+			zap.Error(err))
+		return err
+	}
+	return nil
+}
