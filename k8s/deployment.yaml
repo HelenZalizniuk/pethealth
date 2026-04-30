@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: pethealth
-        image: pethealth:v1 
+        image: pethealth:v2
         imagePullPolicy: Never # do not find image in registry, use local one
         ports:
         - containerPort: 8080
@@ -24,4 +24,15 @@ spec:
         - configMapRef:
             name: pethealth-config
 
-        # TODO: DB и Kafka
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pethealth-service 
+spec:
+  selector:
+    app: pethealth
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080

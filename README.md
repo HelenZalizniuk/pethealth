@@ -1,71 +1,83 @@
 # PetHealth Service 🐾
 
-High-performance metrics collection and processing system built with **Go**. Designed for scalability, data integrity, and observability.
+A high-performance metrics collection and processing system built with **Go**. The architecture focuses on write-throughput, data integrity, and observability.
 
-## 🏗 Architecture Highlights
+## 🏗 Architecture Decisions
 
-The project demonstrates advanced backend patterns used in distributed systems:
+The project implements several distributed systems patterns:
 
-* **Database Sharding:** Manual horizontal sharding for PostgreSQL to handle high-write throughput.
-* **Transactional Outbox Pattern:** Ensures 100% data consistency between PostgreSQL and Kafka, preventing data loss during network failures.
-* **Worker Pool Pattern:** Concurrent background workers for processing the Outbox table and consuming Kafka events.
-* **Event-Driven Design:** Asynchronous processing of health alerts via Apache Kafka.
+*   **Transactional Outbox:** Ensures atomicity between state persistence in PostgreSQL and event publishing to Kafka.
+*   **Database Sharding:** Manual horizontal sharding of PostgreSQL based on `pet_id` (consistent hashing) to distribute write load.
+*   **Worker Pool:** Concurrent task processing with a bounded goroutine pool to manage resource consumption and handle graceful shutdown.
+*   **Graceful Shutdown:** Proper handling of `SIGTERM`/`SIGINT` signals to ensure active workers complete tasks without data loss.
+*   **Event-Driven Design:** Asynchronous component interaction via Kafka for service decoupling.
 * **Cloud Native:** Fully containerized and ready for Kubernetes deployment.
 
 ## 🛠 Tech Stack
 
-* **Language:** Go (Golang) 1.25+
-* **API:** Gin Gonic (REST)
-* **Data Serialization:** **Protocol Buffers (Protobuf)** for efficient binary serialization and API contract definition.
-* **Databases:** PostgreSQL (Multiple Shards), GORM
-* **Messaging:** Apache Kafka (segmentio/kafka-go)
-* **Logging:** Uber-Zap (Structured Logging)
-* **Infrastructure:** Docker, Docker Compose, Kubernetes (Minikube)
-* **Monitoring:** Prometheus (coming soon)
+*   **Runtime:** Go 1.25+
+*   **API:** Gin Gonic (REST)
+*   **Serialization:** **Protocol Buffers (Protobuf)** for efficient binary serialization
+*   **Storage:** PostgreSQL (Sharded), GORM
+*   **Messaging:** Apache Kafka (segmentio/kafka-go)
+*   **Observability:** Prometheus (metrics), Uber-Zap (logging)
+*   **Infrastructure:** Kubernetes, Docker Compose
 
-## 🚀 Getting Started
+## 🚀 Operations & Deployment
 
-### Prerequisites
-* Docker & Docker Compose
+### Local Infrastructure
 * Minikube (for K8s deployment)
+```bash
+minikube start
+```
+* Docker Compose
+```bash
+# Start infrastructure (DB shards, Kafka, kafdrop)
+docker-compose up -d
+```
 
-### Local Development (Hybrid Mode)
-To run the infrastructure (DBs and Kafka) locally while keeping the app flexible:
+## Run the application locally
+```bash
+go run cmd/server/main.go
+```
+## Kubernetes Management
 
-# Start the infrastructure:
-   ```bash
-   docker-compose up -d
-  ```  
-# Run the application:
-  ```bash
-  go run cmd/server/main.go
- ```
-
-# Kubernetes Deployment
- 
-# Apply configurations
- ```bash
+### 1. Apply configurations and secrets
 kubectl apply -f k8s/config.yaml
- ```
-# Deploy the application
- ```bash
+
+### 2. Deploy the application
 kubectl apply -f k8s/deployment.yaml
-```
-# Access the API
- ```bash
+
+### 3. Resource inspection
+kubectl get all
+kubectl describe pod <pod_name>
+kubectl get configmaps
+
+### 4. Debugging and logs
+kubectl logs -f deployment/pethealth-deployment
+kubectl exec -it <pod_name> -- /bin/sh
+
+### 5. Port-forwarding for API and Monitoring
 kubectl port-forward deployment/pethealth-deployment 8080:8080
-```
+kubectl port-forward svc/prometheus-service 9090:9090
 
-📊 Sharding Logic
-Data is distributed across shards based on the pet_id using a consistent hashing approach:
-shard_index = pet_id % total_shards
+### 6. Cleanup
+kubectl delete -f k8s/deployment.yaml
+kubectl delete -f k8s/config.yaml
 
-This ensures that all data for a specific pet always resides on the same shard, simplifying queries and maintaining locality.
 
-📝 Future Roadmap
+## 📊 Sharding Logic
 
-[ ] Integration with Prometheus & Grafana for shard-level monitoring.
+Data distribution across shards is calculated using a consistent hashing approach:
 
-[ ] Implementation of Graceful Shutdown for K8s pods.
+$$shard\_index = pet\_id \pmod{total\_shards}$$
 
-[ ] Expansion of Sharding logic to support dynamic re-balancing.
+*   **Data Locality:** Ensures all data for a specific pet resides on the same shard.
+*   **Scalability:** Simplifies horizontal scaling of the database layer.
+
+## 📝 Roadmap
+
+*   [ ] **Reliability Layer:** Implementation of **Retry Policy** and **Dead Letter Queues (DLQ)** for Kafka consumers.
+*   [ ] **Distributed Transactions:** **Saga Pattern** for the "Pet Registration & Alert Generation" flow.
+*   [ ] **Observability:** Grafana dashboards for metrics visualization (Kafka lag, Worker Pool state).
+*   [ ] **Tracing:** **Distributed Tracing** integration (OpenTelemetry/Jaeger).

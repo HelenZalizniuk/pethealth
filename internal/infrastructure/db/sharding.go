@@ -46,13 +46,7 @@ func NewShardManager(shardConfigs []config.ShardConfig) (*ShardManager, error) {
 
 // selects the appropriate shard based on the pet ID
 func (s *ShardManager) GetShardById(id uint64) (*gorm.DB, error) {
-	numShards := len(s.shards)
-	if numShards == 0 {
-		return nil, fmt.Errorf("no shards available")
-	}
-
-	// Simple logic: remainder of division
-	shardIndex := int(id % uint64(numShards))
+	shardIndex := s.GetShardIndex(id)
 
 	db, ok := s.shards[shardIndex]
 	if !ok {
@@ -60,4 +54,17 @@ func (s *ShardManager) GetShardById(id uint64) (*gorm.DB, error) {
 	}
 
 	return db, nil
+}
+
+func (s *ShardManager) GetShardIndex(id uint64) int {
+	numShards := len(s.shards)
+	if numShards == 0 {
+		return 0
+	}
+	return int(id % uint64(numShards))
+}
+
+func (s *ShardManager) GetShardName(id uint64) string {
+	shardIndex := s.GetShardIndex(id)
+	return fmt.Sprintf("shard_%d", shardIndex)
 }
