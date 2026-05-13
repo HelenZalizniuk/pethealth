@@ -28,6 +28,7 @@ type App struct {
 	sm            *db.ShardManager
 	relayPool     *worker.WorkerPool
 	consumer      *infrakafka.MetricConsumer
+	sagaConsumer  *infrakafka.SagaResponseConsumer
 }
 
 // root initializer for the application
@@ -37,6 +38,7 @@ func NewApp(cfg *config.Config,
 	sm *db.ShardManager,
 	relayPool *worker.WorkerPool,
 	producer *infrakafka.MetricProducer,
+	sagaConsumer *infrakafka.SagaResponseConsumer,
 ) *App {
 
 	consumer := infrakafka.NewMetricConsumer(
@@ -53,6 +55,7 @@ func NewApp(cfg *config.Config,
 		sm:            sm,
 		relayPool:     relayPool,
 		consumer:      consumer,
+		sagaConsumer:  sagaConsumer,
 	}
 }
 
@@ -82,6 +85,9 @@ func (a *App) Run() error {
 	go a.consumer.Start(workerCtx, func(ctx context.Context, msg kafka.Message) error {
 		return a.MetricHandler.ProcessMetric(ctx, msg.Value)
 	})
+
+	a.Logger.Info("Starting Saga Response consumer...")
+	go a.sagaConsumer.Start(workerCtx)
 
 	// Setup HTTP Server (GIN)
 	r := gin.Default()
@@ -144,6 +150,12 @@ func (a *App) Run() error {
 	// close physical connections
 	if err := a.consumer.Close(); err != nil {
 		a.Logger.Error("Failed to close Kafka consumer", zap.Error(err))
+	}
+
+	if a.sagaConsumer != nil {
+		if err := a.sagaConsumer.Close(); err != nil {
+			a.Logger.Error("Failed to close Saga consumer", zap.Error(err))
+		}
 	}
 
 	// wait for Relay to finish processing current batch
