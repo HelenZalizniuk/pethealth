@@ -13,6 +13,7 @@ type WorkerPool struct {
 	processor   *OutboxProcessor
 	logger      *zap.Logger
 	wg          sync.WaitGroup
+	tasks       chan func(ctx context.Context)
 }
 
 func NewWorkerPool(count int, processor *OutboxProcessor, logger *zap.Logger) *WorkerPool {
@@ -20,19 +21,13 @@ func NewWorkerPool(count int, processor *OutboxProcessor, logger *zap.Logger) *W
 		workerCount: count,
 		processor:   processor,
 		logger:      logger,
+		tasks:       make(chan func(ctx context.Context), 100),
 	}
 }
 
-func (wp *WorkerPool) oldStart(ctx context.Context, task func(ctx context.Context)) {
-	for i := 0; i < wp.workerCount; i++ {
-		wp.wg.Add(1)
-		go func(workerID int) {
-			defer wp.wg.Done()
-			wp.logger.Info("Worker started", zap.Int("worker_id", workerID))
-			task(ctx)
-			wp.logger.Info("Worker stopped", zap.Int("worker_id", workerID))
-		}(i)
-	}
+// add tasks from SagaConsumer to worker pool
+func (wp *WorkerPool) Submit(task func(ctx context.Context)) {
+	wp.tasks <- task
 }
 
 // starting workers in background mode
@@ -52,10 +47,12 @@ func (wp *WorkerPool) Start(ctx context.Context) {
 			for {
 				select {
 				case <-ctx.Done():
-					wp.logger.Info("Outbox Relay worker received shutdown signal", zap.Int("id", id))
+					wp.logger.Info("worker received shutdown signal", zap.Int("id", id))
 					return
 				case <-ticker.C:
 					wp.processor.ProcessNextBatch(ctx, id)
+				case task := <-wp.tasks:
+					task(ctx)
 				}
 			}
 		}(i)

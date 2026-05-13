@@ -11,12 +11,14 @@ type ShardConfig struct {
 }
 
 type Config struct {
-	ServerPort         string
-	KafkaBrokers       []string
-	KafkaTopic         string
-	KafkaDLQTopic      string
-	KafkaConsumerGroup string
-	Shards             []ShardConfig
+	ServerPort             string
+	KafkaBrokers           []string
+	KafkaTopic             string
+	KafkaDLQTopic          string
+	KafkaConsumerGroup     string
+	KafkaSagaTopic         string
+	KafkaSagaConsumerGroup string
+	Shards                 []ShardConfig
 }
 
 func Load() *Config {
@@ -24,7 +26,8 @@ func Load() *Config {
 	topic := getEnv("KAFKA_TOPIC", "pet_events")
 	dlqTopic := getEnv("KAFKA_DLQ_TOPIC", "pet_events_dlq")
 	group := getEnv("KAFKA_CONSUMER_GROUP", "health-service-group")
-
+	sagaTopic := getEnv("KAFKA_SAGA_TOPIC", "pet_saga_responses")
+	sagaGroup := getEnv("KAFKA_SAGA_CONSUMER_GROUP", "pet-health-saga-group")
 	brokersEnv := os.Getenv("KAFKA_BROKERS")
 	if brokersEnv == "" {
 		brokersEnv = "localhost:9092"
@@ -32,11 +35,13 @@ func Load() *Config {
 	brokers := strings.Split(brokersEnv, ",")
 
 	return &Config{
-		ServerPort:         port,
-		KafkaBrokers:       brokers,
-		KafkaTopic:         topic,
-		KafkaDLQTopic:      dlqTopic,
-		KafkaConsumerGroup: group,
+		ServerPort:             port,
+		KafkaBrokers:           brokers,
+		KafkaTopic:             topic,
+		KafkaDLQTopic:          dlqTopic,
+		KafkaConsumerGroup:     group,
+		KafkaSagaTopic:         sagaTopic,
+		KafkaSagaConsumerGroup: sagaGroup,
 		Shards: []ShardConfig{
 			{
 				MasterDSN:  os.Getenv("SHARD_0_MASTER_DSN"),

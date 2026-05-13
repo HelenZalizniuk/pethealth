@@ -2,19 +2,23 @@ package worker
 
 import (
 	"context"
-	"pethealth/internal/infrastructure/kafka"
+	"pethealth/internal/domain/models"
 	"pethealth/internal/infrastructure/repository"
 
 	"go.uber.org/zap"
 )
 
+type EventProducer interface {
+	SendEvent(ctx context.Context, event *models.OutboxEvent) error
+}
+
 type OutboxProcessor struct {
 	repo     *repository.PgOutboxRepository
-	producer *kafka.MetricProducer
+	producer EventProducer
 	logger   *zap.Logger
 }
 
-func NewOutboxProcessor(repo *repository.PgOutboxRepository, producer *kafka.MetricProducer, logger *zap.Logger) *OutboxProcessor {
+func NewOutboxProcessor(repo *repository.PgOutboxRepository, producer EventProducer, logger *zap.Logger) *OutboxProcessor {
 	return &OutboxProcessor{
 		repo:     repo,
 		producer: producer,

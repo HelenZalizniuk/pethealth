@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package pethealth;
+
+message PetProcessingResponse {
+    string event_id = 1;
+    string pet_id   = 2;
+    bool success    = 3;
+    string error_message = 4;
+}

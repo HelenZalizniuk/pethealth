@@ -5,7 +5,7 @@ import (
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/plugin/dbresolver" // Master/Replica
+	"gorm.io/plugin/dbresolver"
 )
 
 func NewPostgresDB(cfg config.ShardConfig) (*gorm.DB, error) {

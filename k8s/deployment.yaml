@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: pethealth
-        image: pethealth:v2
+        image: pethealth:v3
         imagePullPolicy: Never # do not find image in registry, use local one
         ports:
         - containerPort: 8080

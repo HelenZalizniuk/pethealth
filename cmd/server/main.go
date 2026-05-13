@@ -39,14 +39,19 @@ func main() {
 		logger.Fatal("Failed to initialize ShardManager", zap.Error(err))
 	}
 
+	// repositories
 	metricRepo := repository.NewPGHealthMetricRepository(sm)
 	outboxRepo := repository.NewPGOutboxRepository(sm)
-	thresholds := service.NewStaticThresholdService(140.0)
+	petRepo := repository.NewPGPetRepository(sm)
 
+	// usecases
+	thresholds := service.NewStaticThresholdService(140.0)
 	uc := usecase.NewMetricUseCase(metricRepo, outboxRepo, thresholds)
 
+	// transport
 	handler := transport.NewMetricHandler(uc, v, logger)
 
+	// kafka
 	producer := kafka.NewMetricProducer(cfg.KafkaBrokers, cfg.KafkaTopic, logger)
 	defer producer.Close()
 
@@ -59,11 +64,14 @@ func main() {
 		)
 	}
 
+	// Workers & Saga
 	relayProcessor := worker.NewOutboxProcessor(outboxRepo, producer, logger)
 	relayPool := worker.NewWorkerPool(2, relayProcessor, logger)
 
+	sagaConsumer := kafka.NewSagaResponseConsumer(cfg, petRepo, relayPool)
+
 	// initialize
-	application := app.NewApp(cfg, handler, logger, sm, relayPool, producer)
+	application := app.NewApp(cfg, handler, logger, sm, relayPool, producer, sagaConsumer)
 
 	// run the application (starts HTTP server, etc.)
 	if err := application.Run(); err != nil {
